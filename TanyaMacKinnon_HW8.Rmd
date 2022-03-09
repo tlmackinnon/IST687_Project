@@ -1,0 +1,262 @@
+# Intro to Data Science HW 8
+##### Copyright Jeffrey Stanton, Jeffrey Saltz, and Jasmina Tacheva
+
+
+```{r}
+# Enter your name here: Tanya MacKinnon
+```
+
+### Attribution statement: (choose only one and delete the rest)
+
+
+```{r}
+# 1. I did this homework by myself, with help from the book and the professor.
+
+```
+
+Supervised learning means that there is a **criterion one is trying to predict**. The typical strategy is to **divide data** into a **training set** and a **test set** (for example, **two-thirds training** and **one-third test**), train the model on the training set, and then see how well the model does on the test set. <br>
+
+**Support vector machines (SVM)** are a highly flexible and powerful method of doing **supervised machine learning**.
+
+Another approach is to use **partition trees (rpart)** 
+
+In this homework, we will use another banking dataset to train an SVM model, as well as an rpart model, to **classify potential borrowers into 2 groups of credit risk** – **reliable borrowers** and **borrowers posing a risk**. You can learn more about the variables in the dataset here:<br> https://archive.ics.uci.edu/ml/datasets/Statlog+%28German+Credit+Data%29 <br>
+
+This kind of classification algorithms is used in many aspects of our lives – from credit card approvals to stock market predictions, and even some medical diagnoses. <br>
+
+## Part 1: Load and condition the data  
+
+A.	Read the contents of the following .csv file into a dataframe called **credit**: <br>
+
+https://intro-datascience.s3.us-east-2.amazonaws.com/GermanCredit.csv <br>
+
+You will also need to install( ) and library( ) several other libraries, such as **kernlab** and **caret**.
+
+
+
+```{r}
+
+# Ensure packages are available
+EnsurePackage<-function(x) {
+  x<- as.character(x)
+  
+  if(!require(x,character.only = TRUE)) {
+    install.packages(pkgs=x,repos="http://cran.r-project.org/")
+    require(x,character.only = TRUE)
+  }
+}
+EnsurePackage("tidyverse")
+EnsurePackage("ggplot2")
+EnsurePackage("ggmap")
+EnsurePackage("caret")
+EnsurePackage("jsonlite")
+EnsurePackage("imputeTS")
+EnsurePackage("kernlab")
+EnsurePackage("rpart")
+EnsurePackage("e1071")
+
+#load libraries 
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggmap)
+library(imputeTS)
+library(caret)
+library(jsonlite)
+library(kernlab)
+library(rpart)
+library(e1071)
+library(rpart.plot)
+
+
+#read data file into variable
+credit <- read_csv("https://intro-datascience.s3.us-east-2.amazonaws.com/GermanCredit.csv")
+#review dataset with summary function
+summary(credit)
+#review dataset with structure function
+str(credit)
+```
+
+B.	Which variable contains the outcome we are trying to predict, **credit risk**? For the purposes of this analysis, we will focus only on the numeric variables and save them in a new dataframe called **cred**:
+
+
+```{r}
+#The outcome variable is the field credit_risk which stores a number of either 1 or 0.
+# create a new dataframe variable
+cred <- data.frame(duration=credit$duration, 
+                   amount=credit$amount,
+                   installment_rate=credit$installment_rate, 
+                   present_residence=credit$present_residence, 
+                   age=credit$age, 
+                   credit_history=credit$number_credits, 
+                   people_liable=credit$people_liable, 
+                   credit_risk=as.factor(credit$credit_risk))
+#review new data frame
+str(cred)
+summary(cred)
+
+
+
+
+```
+C.	Although all variables in **cred** except **credit_risk** are coded as numeric, the values of one of them are also **ordered factors** rather than actual numbers. In consultation with the **data description link** from the intro, write a comment identifying the **factor variable** and briefly **describe** each variable in the dataframe. 
+
+
+```{r}
+# Installment_rate, present_residence, and credit_history are all factor variables. Installment_rate attribute measures the installment rate in percentage of disposable income. Present residences describes how old this in this residence. Credit_history contains the number of credit lines. These values appear to have been converted to factors using a 0-5 cost matrix. 
+
+range(cred$installment_rate)
+range(cred$credit_history)
+range(cred$present_residence)
+```
+
+## Part 2: Create training and test data sets
+
+A.	Using techniques discussed in class, create **two datasets** – one for **training** and one for **testing**.
+
+
+```{r}
+#set.seed function is used to control randomization and ensure results can be reproduced
+set.seed (8)
+
+#create sample
+sample <- cred$duration %>% 
+  createDataPartition(p=.66,list = FALSE)
+
+#store samples in variables
+train <- cred[sample,]
+test <- cred[-sample,]
+
+#review sample datasets with structure function
+summary(train)
+summary(test)
+
+```
+
+B.	Use the dim( ) function to demonstrate that the resulting training data set and test data set contain the appropriate number of cases.
+
+
+```{r}
+#review dimensions of datasets
+
+dim(train)
+dim(test)
+
+```
+
+## Part 3: Build a Model using SVM
+
+A.	Using the caret package, build a support vector model using all of the variables to predict **credit_risk**
+
+
+```{r}
+#create svm model and store in variable
+
+svm <- train (credit_risk ~ ., data=train, method="svmRadial", preproc=c("center","scale"))
+
+
+
+```
+
+B. output the model
+
+Hint: explore finalModel in the model that would created in F.
+
+
+```{r}
+#view model
+svm
+
+
+```
+
+## Part 4: Predict Values in the Test Data and Create a Confusion Matrix
+
+A.	Use the predict( ) function to validate the model against test data. Store the predictions in a variable named **svmPred**.
+
+
+```{r}
+#predict results using svm model and test sample dataset
+svmPred <- predict(svm,newdata=test)
+svmPred
+```
+
+B.	The **svmPred** object contains a list of classifications for reliable (=0) or risky (=1) borrowers. Review the contents of **svmPred** using head( ).
+
+
+```{r}
+head(svmPred)
+```
+
+C.	Explore the **confusion matrix**, using the caret package
+
+
+```{r}
+
+confused <- confusionMatrix(svmPred,test$credit_risk)
+confused
+```
+
+D.	What is the **accuracy** based on what you see in the confusion matrix. 
+
+
+```{r}
+
+#The accurarcy is 68.14% and the no information rate is 68.73
+
+
+```
+
+E.	Compare your calculations with the **confusionMatrix()** function from the **caret** package.
+
+
+```{r}
+
+```
+
+F.	Explain, in a block comment:<br> 1) why it is valuable to have a “test” dataset that is separate from a “training” dataset, and <br>2) what potential ethical challenges this type of automated classification may pose. 
+
+
+```{r}
+
+
+
+```
+
+## Part 5: Now build a tree model (with rpart)
+
+A. Build a model with rpart
+<br>
+Note: you might need to install the e1071 package
+
+
+```{r}
+
+Tree <- rpart(credit_risk ~.,data=cred)
+Tree
+
+```
+
+B. Visualize the results using  rpart.plot()
+
+
+```{r}
+prp(Tree,extra=1)
+```
+
+C. Use the **predict()** function to predict the testData, and then generate a confusion matrix to explore the results
+
+
+```{r}
+
+predictresults <- predict(svm,newdata = test, type="raw")
+confusionMatrix(predictresults, test$credit_risk)
+
+```
+
+D. Review the attributes being used for this credit decision. Are there any that might not be appropriate, with respect to fairness? If so, which attribute, and how would you address this fairness situation. Answer in a comment block below
+
+
+```{r}
+
+```
